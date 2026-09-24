@@ -65,6 +65,8 @@
       ffi.enable = true;
     '';
   };
+  # Elixir SDK (secretspec-ex) is a Rustler NIF that embeds the resolver.
+  languages.elixir.enable = true;
   languages.java = {
     enable = true;
     jdk.package = pkgs.jdk21;

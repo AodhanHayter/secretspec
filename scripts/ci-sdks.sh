@@ -23,7 +23,8 @@ cargo build \
   -p libsecretspec \
   -p secretspec \
   -p secretspec-node-native \
-  -p secretspec-php-native
+  -p secretspec-php-native \
+  -p secretspec_nif
 
 target_dir="$(cargo metadata --no-deps --format-version 1 \
   | grep -o '"target_directory":"[^"]*"' | head -1 | sed 's/.*:"\(.*\)"/\1/')"
@@ -191,6 +192,20 @@ run_jvm() {
   ( cd secretspec-jvm && ./gradlew build )
 }
 
+run_elixir() {
+  echo "==> Elixir"
+  # mix test compiles the Rustler NIF from source (dev/test force the build),
+  # reusing the shared Cargo build above.
+  (
+    cd secretspec-ex
+    mix local.hex --force --if-missing
+    mix deps.get
+    mix format --check-formatted
+    mix test
+    mix run --no-start -e 'for f <- Path.wildcard("examples/*.exs"), do: Code.string_to_quoted!(File.read!(f))'
+  )
+}
+
 run_php() {
   echo "==> PHP"
   # The PHP SDK has two native backends over the same resolver; exercise both.
@@ -242,6 +257,7 @@ start_suite Node run_node
 start_suite Haskell run_haskell
 start_suite .NET run_dotnet
 start_suite JVM run_jvm
+start_suite Elixir run_elixir
 start_suite PHP run_php
 
 failed_suites=()

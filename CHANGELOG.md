@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Elixir SDK (0.22+): the `secretspec` Hex package resolves secrets through a
+  Rustler NIF that embeds the SecretSpec resolver, with the same builder,
+  report, scope, inline-spec, and `as_path` behavior as the other SDKs.
+  Requires Elixir 1.18 or later.
+
 ### Fixed
 
 - The published `secretspec` crate includes every fixture its tests need, so

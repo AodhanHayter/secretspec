@@ -1,0 +1,15 @@
+[package]
+# Rustler requires the package name to match the NIF library name.
+name = "secretspec_nif"
+version.workspace = true
+edition.workspace = true
+repository = "https://github.com/cachix/secretspec"
+description = "Rustler NIF for the Elixir SDK"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+rustler = "0.38"
+secretspec = { workspace = true }

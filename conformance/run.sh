@@ -101,6 +101,13 @@ run_jvm() { (
   cd secretspec-jvm
   ./gradlew test
 ); }
+run_elixir() { (
+  # The Rustler NIF embeds the resolver; mix test builds it from source.
+  cd secretspec-ex
+  mix local.hex --force --if-missing >/dev/null
+  mix deps.get >/dev/null
+  mix test test/conformance_test.exs
+); }
 
 run "Python"  python run_python
 run "Go"      go     run_go
@@ -117,6 +124,7 @@ else
 fi
 # The gradle wrapper will download gradle, use "bash" as a placeholder
 run "JVM"     bash   run_jvm
+run "Elixir"  mix    run_elixir
 
 echo
 echo "==> Conformance summary"

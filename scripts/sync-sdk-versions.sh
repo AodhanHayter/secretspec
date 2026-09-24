@@ -135,6 +135,16 @@ update_file() {
         END { if (!changed) exit 1 }
       ' "$file" > "$tmp"
       ;;
+    mix)
+      awk -v version="$workspace_version" '
+        !changed && /^[[:space:]]*@version[[:space:]]+"/ {
+          sub(/@version[[:space:]]+"[^"]+"/, "@version \"" version "\"")
+          changed = 1
+        }
+        { print }
+        END { if (!changed) exit 1 }
+      ' "$file" > "$tmp"
+      ;;
     *)
       echo "unknown manifest kind: $kind" >&2
       rm -f "$tmp"
@@ -153,5 +163,6 @@ update_file secretspec-dotnet/src/SecretSpec/SecretSpec.csproj csproj
 update_file secretspec-dotnet/tests/SecretSpec.PackageSmoke/SecretSpec.PackageSmoke.csproj csproj
 update_file secretspec-jvm/gradle.properties gradle-properties
 update_file Package.swift swift-package
+update_file secretspec-ex/mix.exs mix
 
 echo "synced SDK package versions to $workspace_version"

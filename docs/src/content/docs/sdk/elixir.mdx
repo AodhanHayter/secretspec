@@ -1,0 +1,137 @@
+---
+title: Elixir SDK
+description: Resolve SecretSpec secrets from Elixir
+---
+
+import VersionCompatibility from '@cachix/site-kit/ui/VersionCompatibility.astro';
+
+import { Code } from 'astro:components';
+import quickStartExample from '../../../../../secretspec-ex/examples/quick_start.exs?raw';
+import scopesExample from '../../../../../secretspec-ex/examples/scopes.exs?raw';
+import typedAccessExample from '../../../../../secretspec-ex/examples/typed_access.exs?raw';
+
+<VersionCompatibility version="0.22" />
+
+The Elixir SDK (`secretspec` on Hex) is a thin client over a
+[Rustler](https://github.com/rusterlium/rustler) NIF that calls
+`secretspec::resolve_json` directly. Resolution (providers, chains, profiles,
+generation, `as_path`) happens in the Rust core, so the SDK inherits every
+provider with no Elixir-side logic. It requires Elixir 1.18 or later.
+
+## Install
+
+```elixir
+# mix.exs
+def deps do
+  [{:secretspec, "~> 0.22"}]
+end
+```
+
+The package downloads a precompiled NIF for your platform through
+[RustlerPrecompiled](https://github.com/philss/rustler_precompiled). To build
+the NIF from source instead, depend on a checkout of the SecretSpec repository
+(`{:secretspec, path: "path/to/secretspec/secretspec-ex"}`), add
+`{:rustler, "~> 0.38"}` to your dependencies, have a Rust toolchain installed,
+and set `SECRETSPEC_BUILD=1`. The NIF builds inside the repository's Cargo
+workspace, so the Hex package alone cannot be built from source.
+
+## Quick start
+
+<Code code={quickStartExample} lang="elixir" meta='title="quick_start.exs"' />
+
+`SecretSpec.load/1` returns `{:ok, %SecretSpec.Resolved{}}`. A missing required
+secret returns `{:error, %SecretSpec.MissingRequiredError{}}`; any other
+failure returns `{:error, %SecretSpec.Error{}}` with a stable `kind`.
+`SecretSpec.load!/1` raises those exceptions instead.
+
+Every `with_*` function ignores `nil`, so optional settings can be piped
+through unconditionally.
+
+Resolution can launch provider CLIs and use the network, so the NIF runs on a
+dirty I/O scheduler and does not block other BEAM processes.
+
+## Runtime configuration
+
+Resolve secrets in `config/runtime.exs` to configure your application at boot,
+in development and in releases:
+
+```elixir
+import Config
+
+resolved = SecretSpec.load!(SecretSpec.builder(reason: "runtime config"))
+
+config :my_app, MyApp.Repo,
+  url: SecretSpec.ResolvedSecret.get(resolved.secrets["DATABASE_URL"])
+```
+
+## Environment and subprocesses
+
+The resolver runs inside the BEAM and reads the operating system environment of
+the VM process. Since OTP 21, `System.put_env/2` changes only the BEAM's own
+copy of the environment. The resolver does not see those changes. Pass
+settings through builder options such as `provider:` and `profile:`, or set
+`SECRETSPEC_*` variables, `env://` values, and CLI paths such as
+`SECRETSPEC_OPCLI_PATH` before the VM starts.
+
+Providers such as 1Password, LastPass, and `pass` run a command-line tool and
+wait for it to exit. The BEAM ignores `SIGCHLD` by default, which would let the
+kernel remove the finished tool before the resolver can read its exit status.
+On Unix, the SDK therefore sets `SIGCHLD` to the operating system default with
+`:os.set_signal(:sigchld, :default)` before it resolves, and leaves it set.
+Ports and `System.cmd/3` are not affected.
+
+## Caller context
+
+```elixir
+SecretSpec.builder()
+|> SecretSpec.with_caller(%SecretSpec.CallerContext{
+  name: "git",
+  version: "2.51.0",
+  operation: "credential_get",
+  resource: "github.com"
+})
+```
+
+Caller context identifies the invoking integration in audit records but never
+satisfies `require_reason`. Do not put credentials or secret values in it.
+
+## Inline specifications
+
+Use `SecretSpec.with_inline_spec(builder, spec, base_dir)` to resolve a strict
+inline-spec v2 map without a manifest file. `base_dir` resolves relative
+provider paths. An inline call uses the versioned native entry point, so it
+cannot fall back to a filesystem manifest.
+
+## Scopes
+
+Use `SecretSpec.with_scope(builder, "api")` to resolve only a named
+`[scopes.api]` subset. The selected name is available as `resolved.scope` and
+`report.scope`:
+
+<Code code={scopesExample} lang="elixir" meta='title="scopes.exs"' />
+
+## Reports
+
+`SecretSpec.report/1` returns a value-free `%SecretSpec.Report{}`: each
+declared secret's status (`:resolved`, `:missing_required`, or
+`:missing_optional`) and provenance. A missing required secret is a status
+here, not an error.
+
+## `as_path` secrets
+
+Secrets declared with `as_path = true` resolve to a temporary file. Their
+`path` stays valid after resolution, and the caller owns the file. Call
+`SecretSpec.Resolved.close/1` when you are done to remove the files. It tries
+every file and returns the first failure as `{:error, %File.Error{}}`.
+
+## Typed access (codegen)
+
+Generate a typed struct with `secretspec schema` plus
+[quicktype](https://quicktype.io), then build it from
+`SecretSpec.Resolved.fields/1`:
+
+```bash
+$ secretspec schema | quicktype -s schema --top-level AppSecrets --lang elixir -o lib/app_secrets.ex
+```
+
+<Code code={typedAccessExample} lang="elixir" meta='title="typed_access.exs"' />

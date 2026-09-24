@@ -5,6 +5,7 @@ members = [
   "libsecretspec",
   "secretspec-ipc",
   "conformance/ipc/runner",
+  "secretspec-ex/native/secretspec_nif",
   "secretspec-node",
   "secretspec-php",
   "secretspec-py",
